@@ -1,10 +1,31 @@
 function onAPILoad() {
 
-    $.ajax({
-        url: 'https://apimgmt-shareddev-api-01.azure-api.net/tracking/?api-version=1.0&truckNo=108&startDate=2019-12-18&endDate=2019-12-18&customerId=d30c4212e520ad38afea9f1e&orderId=0428c4bf4d8cfcafbe4a3c31&deliveryTicketId=52997dd5f5b42e98874504fa&geoJsonOnly=True',
-        contentType: "application/json",
-        dataType: 'json',
-        success: (data) => main(data)
+    // $.ajax({
+    //     url: 'https://apimgmt-shareddev-api-01.azure-api.net/tracking/?api-version=1.0&truckNo=108&startDate=2019-12-18&endDate=2019-12-18&customerId=d30c4212e520ad38afea9f1e&orderId=0428c4bf4d8cfcafbe4a3c31&deliveryTicketId=52997dd5f5b42e98874504fa&geoJsonOnly=True',
+    //     contentType: "application/json",
+    //     dataType: 'json',
+    //     success: (data) => main(data)
+    // });
+
+    var sigRconnection = new signalR.HubConnectionBuilder()
+        .withUrl("http://localhost:5000/chatHub")
+        .configureLogging(signalR.LogLevel.Debug)
+        .build();
+
+    sigRconnection.on("ReceiveCoords", (message) => {
+        main(message)
+    });
+
+    sigRconnection.start()
+        .then(() => {
+            sigRconnection
+                .invoke("SendMessage")
+                .catch(function (err) {
+                        console.error(err.toString());
+                    });
+    })
+    .catch((err) => {
+        console.error(err.toString());
     });
 }
 
