@@ -12,10 +12,6 @@ function onAPILoad() {
         .configureLogging(signalR.LogLevel.Debug)
         .build();
 
-    sigRconnection.on("ReceiveCoords", (message) => {
-        main(message)
-    });
-
     sigRconnection.start()
         .then(() => {
             sigRconnection
@@ -27,54 +23,79 @@ function onAPILoad() {
     .catch((err) => {
         console.error(err.toString());
     });
+
+    let receivedMessagesCount = 1;
+    let map;
+    let destination;
+
+    sigRconnection.on("ReceiveCoords", (message) => {
+        
+        // Transform the coords to a Google LatLng array 
+        let latLngArr = [];
+        for (let i=0; i < message.length; i++) {
+            latLngArr.push(
+                new google.maps.LatLng(message[i][1], message[i][0]) // Latitude and Longitude are swapped in the TT API
+            )
+        }
+
+        let first_coords = getMinCoords(message);
+        let last_coords = getMaxCoords(message);
+        
+        if(receivedMessagesCount == 1) {
+
+            initMap(new google.maps.LatLng(message[0][1], message[0][0]))
+                .then((data) => {
+                    //console.error('HERE', data)
+                    map = data;
+                });
+
+            // Delivery address comming from the Delivery Ticket API
+            let deliveryAddress = '46396 Nygård, Sweden';
+
+            // Get the coordinates from the Google API and draw the remaining path
+            ensureDestinationCoords(deliveryAddress)
+                .then((data) => {
+                    destination = data;
+                    // drawRoute(last_coords, data, map);
+                });
+        }
+        receivedMessagesCount++;
+
+        // Draw the truck path
+        drawPolyline(latLngArr, map)
+
+        drawRoute(last_coords, destination, map);
+
+        console.log('latLngArr', latLngArr, map)
+    });
 }
 
-function main(path) {
+function main(path, map) {
 
     let first_coords = getMinCoords(path);
     let last_coords = getMaxCoords(path);
     
-    // Transform the coords to a Google LatLng array 
-    let latLngArr = [];
-    for (let i=0; i < path.length; i++) {
-        latLngArr.push(
-            new google.maps.LatLng(path[i][1], path[i][0]) // Latitude and Longitude are swapped in the TT API
-        )
-    }
 
-    // Get the center of the route
-    let bounds = new google.maps.LatLngBounds();
-    latLngArr.map((x) => bounds.extend(x));
-    let center = bounds.getCenter();
+    // // Get the center of the route
+    // let bounds = new google.maps.LatLngBounds();
+    // latLngArr.map((x) => bounds.extend(x));
+    // let center = bounds.getCenter();
 
-    let map = initMap(center)
 
-    // Draw the truck path
-    drawPolyline(latLngArr, map)
-
-    // Delivery address comming from the Delivery Ticket API
-    let deliveryAddress = '46396 Nygård, Sweden';
-
-    // Or we can directly pass coordinates and the function handles them as well
-    // let deliveryAddress = {
-    //     lat: 57.960142,
-    //     lng: 12.121977
-    // }
-
-    // Get the coordinates from the Google API and draw the remaining path
-    ensureDestinationCoords(deliveryAddress)
-        .then((destination) => {
-            drawRoute(last_coords, destination, map);
-        });
+    
 }
 
 function initMap(coords) {
-    let options = {
-        center: coords,
-        zoom: 12
-    };
+    console.log('initMap', coords)
+    return new Promise((resolve) => {
+        let options = {
+            center: coords,
+            zoom: 12
+        };
 
-    return new google.maps.Map(document.getElementById('map'), options);
+        let map = new google.maps.Map(document.getElementById('map'), options);
+        resolve(map);
+    });
 }
 
 function drawMarkers(markers, map) {
